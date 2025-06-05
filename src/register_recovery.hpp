@@ -13,7 +13,6 @@ private:
     float beta_quantile;
     float criterion;
     int population;
-    bool quantiles_set = false;
     bool parameters_set = false;
 
     std::bitset<320> gamma_template;
@@ -29,5 +28,5 @@ public:
     void recover_L1();
     void recover_L2();
 
-    register_recovery(float alpha_q, float beta_q);
+    register_recovery(float alpha_q = 0, float beta_q = 0);
 };

@@ -13,16 +13,13 @@ register_recovery::register_recovery(float alpha_q, float beta_q):alpha_quantile
 void register_recovery::set_quantiles(float alpha_q, float beta_q){
     alpha_quantile = alpha_q;
     beta_quantile = beta_q;
-    quantiles_set = true;
     parameters_set = false;
 }
 
 void register_recovery::set_critical_set(){
-    if(!quantiles_set){
-        throw runtime_error("Undefined quantiles");
-    }
     population = static_cast<int>(pow((beta_quantile*sqrt(0.25)+alpha_quantile*sqrt(0.1875))/(0.25), 2));
     criterion = static_cast<float>(population*(0.25)+alpha_quantile*sqrt(population*(0.25)));
+
     parameters_set = true;
 }
 
@@ -38,7 +35,7 @@ void register_recovery::set_gamma_template(std::string& sequence){
     }
     gamma_template.reset();
     for(int i = 0; i < population; i++){
-        if(sequence[i] == 1){
+        if(sequence[i] == '1'){
             gamma_template.set(i);
         }
     }
@@ -86,6 +83,9 @@ void register_recovery::recover_L1(){
         }
     }
     );
+    for(int i = 0; i < static_cast<int>(L1_candidates.size()); i++){
+        cout << L1_candidates[i] << "\n";
+    }
 }
 
 void register_recovery::recover_L2(){
@@ -100,9 +100,12 @@ void register_recovery::recover_L2(){
                 gamma[j] = l_register.fast_clock();
             }
             if(recognize(gamma)){
-                L1_candidates.push_back(i);
+                L2_candidates.push_back(i);
             }
         }
     }
     );
+    for(int i = 0; i < static_cast<int>(L2_candidates.size()); i++){
+        cout << L2_candidates[i] << "\n";
+    }
 }
