@@ -67,11 +67,11 @@ bool register_recovery::recognize(std::bitset<320>& gamma){
 }
 
 void register_recovery::recover_L1(){
-    uint32_t chunk_num = 0x40000000/4096;
+    uint32_t chunk_num = 0x40000000/16384;
     concurrency::parallel_for(uint32_t(0), chunk_num, [&](uint32_t chunk_index){
         bitset<320> gamma;
         lfsr l_register(30, 0x32800000);
-        for(uint32_t i = chunk_index*4096; i < (chunk_index+1)*4096; i++){
+        for(uint32_t i = chunk_index*16384; i < (chunk_index+1)*16384; i++){
             gamma.reset();           
             l_register.set_register(i);
             for(int j = 0; j < population; j++){
@@ -89,11 +89,11 @@ void register_recovery::recover_L1(){
 }
 
 void register_recovery::recover_L2(){
-    uint32_t chunk_num = 0x80000000/4096;
+    uint32_t chunk_num = 0x80000000/32768;
     concurrency::parallel_for(uint32_t(0), chunk_num, [&](uint32_t chunk_index){
         bitset<320> gamma;
         lfsr l_register(31, 0x48000000);
-        for(uint32_t i = chunk_index*4096; i < (chunk_index+1)*4096; i++){
+        for(uint32_t i = chunk_index*32768; i < (chunk_index+1)*32768; i++){
             gamma.reset();           
             l_register.set_register(i);
             for(int j = 0; j < population; j++){
@@ -113,17 +113,29 @@ void register_recovery::recover_L2(){
 
 void register_recovery::recover_L3(){
     const uint32_t gamma_template_32 = 0x82AB0478;    
-    geffe_generator gn;
-    concurrency::parallel_for(int(0), static_cast<int>(L2_candidates.size()), [&](int i){
-        bitset<32> mask;
+    for(int i = 0; i < static_cast<int>(L2_candidates.size()); i++){
+        uint32_t mask_1, mask_0;
         for(int j = 0; j < static_cast<int>(L1_candidates.size()); j++){
-            if(((!(L1_candidates[j]^L2_candidates[i]))&(L2_candidates[i]^gamma_template_32))!=0){
+            if(((~(L1_candidates[j]^L2_candidates[i]))&(L2_candidates[i]^gamma_template_32))!=0){
                 continue;
             }
+
+            //1 if 1 in the mask is set, 0 in the other case
+            mask_1 = (L1_candidates[j]^L2_candidates[i])&(L2_candidates[i]^gamma_template_32);
+            //0 if 0 in the mask is set, 1 in the other case
+            mask_0 = (~(L1_candidates[j]^L2_candidates[i]))|(L2_candidates[i]^gamma_template_32);
             
-            gn.set_register(0, L1_candidates[j]);
-            gn.set_register(1, L2_candidates[i]);
+            uint64_t chunk_num = 0x100000000ull/131072;
+            concurrency::parallel_for(uint64_t(0), chunk_num, [&](uint64_t chunk_index){
+                geffe_generator gn;
+                gn.set_register(0, L1_candidates[j]);
+                gn.set_register(1, L2_candidates[i]);                 
+                for(uint64_t i = chunk_index*131072; i < (chunk_index+1)*131072; i++){
+                    gn.set_register(2, static_cast<uint32_t>(i));
+                    //
+                }
+            }
+            );
         }
     }
-    );
 }

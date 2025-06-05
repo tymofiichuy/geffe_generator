@@ -5,7 +5,7 @@ using namespace std;
 geffe_generator::geffe_generator():r_30(30, 0x32800000),r_31(31, 0x48000000),r_32(32, 0xF5000000){};
 
 bool geffe_generator::clock_function(bool x, bool y, bool s){
-    return ((s&&x)^((true^s)&&y));
+    return ((s&&x)^((!s)&&y));
 }
 
 void geffe_generator::set_register(uint32_t reg, uint8_t index){
