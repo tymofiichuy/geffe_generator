@@ -83,9 +83,10 @@ void register_recovery::recover_L1(){
         }
     }
     );
-    for(int i = 0; i < static_cast<int>(L1_candidates.size()); i++){
-        cout << L1_candidates[i] << "\n";
-    }
+    cout << "L1 candidates are found.\n";
+    // for(int i = 0; i < static_cast<int>(L1_candidates.size()); i++){
+    //     cout << L1_candidates[i] << "\n";
+    // }
 }
 
 void register_recovery::recover_L2(){
@@ -105,6 +106,7 @@ void register_recovery::recover_L2(){
         }
     }
     );
+    cout << "L2 candidates are found.\n";
     // for(int i = 0; i < static_cast<int>(L2_candidates.size()); i++){
     //     cout << L2_candidates[i] << "\n";
     // }
@@ -120,19 +122,54 @@ void register_recovery::recover_L3(){
                 continue;
             }
 
+            unsigned int m_1_count, m_0_count;
             //1 if 1 in the mask is set, 0 in the other case
             mask_1 = (L1_candidates[j]^L2_candidates[i])&(L2_candidates[i]^gamma_template_32);
+            m_1_count = __popcnt(mask_1);
             //0 if 0 in the mask is set, 1 in the other case
             mask_0 = (~(L1_candidates[j]^L2_candidates[i]))|(L2_candidates[i]^gamma_template_32);
+            m_0_count = __popcnt(mask_0);
             
             uint64_t chunk_num = 0x100000000ull/131072;
+            atomic_bool term = false;
             concurrency::parallel_for(uint64_t(0), chunk_num, [&](uint64_t chunk_index){
-                geffe_generator gn;
-                gn.set_register(0, L1_candidates[j]);
-                gn.set_register(1, L2_candidates[i]);                 
-                for(uint64_t i = chunk_index*131072; i < (chunk_index+1)*131072; i++){
-                    gn.set_register(2, static_cast<uint32_t>(i));
-                    //
+                if(!term.load()){
+                    geffe_generator gn;
+                    uint32_t sample;
+                    bool bit;
+                    for(uint64_t k = chunk_index*131072; k < (chunk_index+1)*131072; k++){
+                        gn.set_register(0, L1_candidates[j]);
+                        gn.set_register(1, L2_candidates[i]);                       
+                        gn.set_register(2, static_cast<uint32_t>(k));
+                        sample = 0;
+                        for(uint8_t s = 0; s < 32; s++){
+                            bit = gn.clock();
+                            if(bit){
+                                sample |= 1<<s;
+                            }
+                        }
+                        if(__popcnt(sample&mask_1)!=m_1_count){
+                            continue;
+                        }
+                        if(__popcnt(sample|mask_0)!=m_0_count){
+                            continue;
+                        }
+                        gn.set_register(0, L1_candidates[j]);
+                        gn.set_register(1, L2_candidates[i]);
+                        gn.set_register(2, static_cast<uint32_t>(k));
+                        bool flag = true;
+                        for(int s = 0; s < static_cast<int>(gamma_template.size()); s++){
+                            if(!(gn.clock()&gamma_template[s])){
+                                flag = false;
+                                break;
+                            }
+                        }
+                        if(flag){
+                            cout << L1_candidates[j] << " " << L2_candidates[i] << " " << static_cast<uint32_t>(k);
+                            term.store(true);
+                            return;
+                        }
+                    }                    
                 }
             }
             );
