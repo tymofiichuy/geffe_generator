@@ -41,6 +41,18 @@ void register_recovery::set_gamma_template(std::string& sequence){
     }
 }
 
+void register_recovery::set_full_gamma_template(std::string& sequence){
+    if(!std::all_of(sequence.begin(), sequence.end(), [](char c) { return c == '0' || c == '1'; })) {
+        throw std::invalid_argument("Invalid template");
+    }
+    full_gamma_template.reset();
+    for(int i = 0; i < population; i++){
+        if(sequence[i] == '1'){
+            full_gamma_template.set(i);
+        }
+    }
+}
+
 // void register_recovery::prepare_file(const string& out_file){
 //     ofstream out(out_file, ios::binary);
 //     if(!out){
@@ -158,14 +170,14 @@ void register_recovery::recover_L3(){
                         gn.set_register(1, L2_candidates[i]);
                         gn.set_register(2, static_cast<uint32_t>(k));
                         bool flag = true;
-                        for(int s = 0; s < static_cast<int>(gamma_template.size()); s++){
-                            if(!(gn.clock()&gamma_template[s])){
+                        for(int s = 0; s < static_cast<int>(full_gamma_template.size()); s++){
+                            if(!(gn.clock()&full_gamma_template[s])){
                                 flag = false;
                                 break;
                             }
                         }
                         if(flag){
-                            cout << L1_candidates[j] << " " << L2_candidates[i] << " " << static_cast<uint32_t>(k);
+                            cout << L1_candidates[j] << " " << L2_candidates[i] << " " << static_cast<uint32_t>(k) << "\n";
                             term.store(true);
                             return;
                         }

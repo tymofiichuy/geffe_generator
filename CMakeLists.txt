@@ -17,6 +17,7 @@ set(SOURCES
 include_directories(${SOURCE_DIR})
 
 add_executable(geffe_generator ${MAIN_DIR}/geffe_generator_driver.cpp ${SOURCES})
+add_executable(registers_recovery ${MAIN_DIR}/registers_recovery.cpp ${SOURCES})
 add_executable(test_L1 ${TEST_DIR}/L1_recovery_test.cpp ${SOURCES})
 add_executable(test_L2 ${TEST_DIR}/L2_recovery_test.cpp ${SOURCES})
 add_executable(test_lfsr ${TEST_DIR}/lfsr_test.cpp ${SOURCES})

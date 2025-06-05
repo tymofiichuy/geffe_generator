@@ -16,12 +16,14 @@ private:
     bool parameters_set = false;
 
     std::bitset<320> gamma_template;
+    std::bitset<2048> full_gamma_template;
     concurrency::concurrent_vector<uint32_t> L1_candidates;
     concurrency::concurrent_vector<uint32_t> L2_candidates;
 public:
     void set_quantiles(float alpha_q, float beta_q);
     void set_critical_set();
     void set_gamma_template(std::string& sequence);
+    void set_full_gamma_template(std::string& sequence);
 
     // void prepare_file(const std::string& out_file);
     bool recognize(std::bitset<320>& gamma);
