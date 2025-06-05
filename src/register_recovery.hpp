@@ -27,6 +27,7 @@ public:
     bool recognize(std::bitset<320>& gamma);
     void recover_L1();
     void recover_L2();
+    void recover_L3();
 
     register_recovery(float alpha_q = 0, float beta_q = 0);
 };

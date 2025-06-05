@@ -105,7 +105,25 @@ void register_recovery::recover_L2(){
         }
     }
     );
-    for(int i = 0; i < static_cast<int>(L2_candidates.size()); i++){
-        cout << L2_candidates[i] << "\n";
+    // for(int i = 0; i < static_cast<int>(L2_candidates.size()); i++){
+    //     cout << L2_candidates[i] << "\n";
+    // }
+    // cout << L2_candidates.size();
+}
+
+void register_recovery::recover_L3(){
+    const uint32_t gamma_template_32 = 0x82AB0478;    
+    geffe_generator gn;
+    concurrency::parallel_for(int(0), static_cast<int>(L2_candidates.size()), [&](int i){
+        bitset<32> mask;
+        for(int j = 0; j < static_cast<int>(L1_candidates.size()); j++){
+            if(((!(L1_candidates[j]^L2_candidates[i]))&(L2_candidates[i]^gamma_template_32))!=0){
+                continue;
+            }
+            
+            gn.set_register(0, L1_candidates[j]);
+            gn.set_register(1, L2_candidates[i]);
+        }
     }
+    );
 }
