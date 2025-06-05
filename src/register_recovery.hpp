@@ -1,16 +1,33 @@
 #pragma once
 
-#include <string>
+#include "geffe_generator.hpp"
 
-template<typename T> class register_recovery{
+#include <string>
+#include <bitset>
+#include <ppl.h>
+#include <concurrent_vector.h>
+
+class register_recovery{
 private:
     float alpha_quantile;
     float beta_quantile;
+    float criterion;
+    int population;
+    bool quantiles_set = false;
+    bool parameters_set = false;
+
+    std::bitset<320> gamma_template;
+    concurrency::concurrent_vector<uint32_t> L1_candidates;
+    concurrency::concurrent_vector<uint32_t> L2_candidates;
 public:
     void set_quantiles(float alpha_q, float beta_q);
-    void prepare_file(const std::string& out_file);
-    bool recognize();
-    void recover_register(T& generator, int register_index, int register_lenght);
+    void set_critical_set();
+    void set_gamma_template(std::string& sequence);
+
+    // void prepare_file(const std::string& out_file);
+    bool recognize(std::bitset<320>& gamma);
+    void recover_L1();
+    void recover_L2();
 
     register_recovery(float alpha_q, float beta_q);
 };
