@@ -96,9 +96,6 @@ void register_recovery::recover_L1(){
     }
     );
     cout << "L1 candidates are found: " << L1_candidates.size() << " items.\n";
-    // for(int i = 0; i < static_cast<int>(L1_candidates.size()); i++){
-    //     cout << L1_candidates[i] << "\n";
-    // }
 }
 
 void register_recovery::recover_L2(){
@@ -119,9 +116,6 @@ void register_recovery::recover_L2(){
     }
     );
     cout << "L2 candidates are found: " << L2_candidates.size() << " items.\n";
-    // for(int i = 0; i < static_cast<int>(L2_candidates.size()); i++){
-    //     cout << L2_candidates[i] << "\n";
-    // }
 }
 
 void register_recovery::recover_L3(){
@@ -140,14 +134,6 @@ void register_recovery::recover_L3(){
             L2_sample_32 = 0;
             L1_sample_320.reset();
             L2_sample_320.reset();
-            // for(int l = 31; l >= 0; l--){
-            //     if(L1_lfsr.fast_clock()){
-            //         L1_sample_32 |= (1<<l);
-            //     }
-            //     if(L2_lfsr.fast_clock()){
-            //         L2_sample_32 |= (1<<l);
-            //     }
-            // }
             for(int l = 319; l >= 0; l--){
                 if(L1_lfsr.fast_clock()){
                     L1_sample_320.set(l);
@@ -164,18 +150,9 @@ void register_recovery::recover_L3(){
                     L2_sample_32 |= (1<<bit);
                 }
             }
-            // if(((~(L1_sample_32^L2_sample_32))&(L2_sample_32^gamma_template_32))!=0){
-            //     continue;
-            // }
-            // else{
-            //     counter_32++;
-            //     if(!((~(L1_sample_320^L2_sample_320))&(L2_sample_320^gamma_template_320)).any()){
-            //         counter_320++;
-            //     }
-            // }
             if(((~(L1_sample_320^L2_sample_320))&(L2_sample_320^gamma_template_320)).any()){
                 continue;
-            }   
+            }  
             unsigned int m_1_count, m_0_count;
             //1 if 1 in the mask is set, 0 in the other case
             mask_1 = (L1_sample_32^L2_sample_32)&(L2_sample_32^gamma_template_32);
@@ -185,19 +162,13 @@ void register_recovery::recover_L3(){
             m_0_count = __popcnt(mask_0);
             not_mask_0 = ~mask_0; 
             
-            // uint64_t chunk_num = 0x100000000ull/131072;
-            // cout << __popcnt(~(not_mask_0|mask_1)) << "\n";
             uint64_t sh = (static_cast<uint64_t>(1)<<__popcnt(~(not_mask_0|mask_1)));
-            // cout << sh << "\n";
             uint64_t chunk_size = 131072;
             uint64_t chunk_num = sh/chunk_size;
-            // cout << chunk_num << "\n";
             while(chunk_num < 16){
                 chunk_size >>= 1;                
                 chunk_num = sh/chunk_size;
             }
-            // cout << chunk_num << "\n";
-            // cout << chunk_size << "\n";
 
             atomic_bool term;
             term.store(false);  
@@ -205,9 +176,6 @@ void register_recovery::recover_L3(){
                 if(term.load()==false){
                     geffe_generator gn;
                     uint32_t L3_candidate;
-                    // uint32_t sample;
-                    // bool bit;
-                    // for(uint64_t k = chunk_index*131072; k < (chunk_index+1)*131072; k++){  
                     for(uint64_t k = chunk_index*chunk_size; k < (chunk_index+1)*chunk_size; k++){
                         uint32_t iteration = static_cast<uint32_t>(k);
                         int counter = 0;
@@ -225,37 +193,9 @@ void register_recovery::recover_L3(){
                                 }
                                 counter++;
                             }
-                            // else if((iteration&(1<<counter))!=0){
-                            //     counter++;
-                            //     L3_candidate ^= (1<<t);
-                            // }
-                        } 
-                        // cout << L3_candidate << "\n";
-
-                        // gn.set_register(L1_candidates[j], 0);
-                        // gn.set_register(L2_candidates[i], 1);                       
-                        // //gn.set_register(static_cast<uint32_t>(k), 2);
-                        // gn.set_register(L3_candidate, 2);
-                        // sample = 0;
-                        // //!!!
-                        // for(int s = 31; s >= 0; s--){
-                        //     bit = gn.clock();
-                        //     if(bit){
-                        //         sample |= (1<<s);
-                        //     }
-                        // } 
-                        // if((sample^gamma_template_32)!=0){
-                        //     continue;
-                        // }
-                        // if(__popcnt(sample&mask_1)!=m_1_count){
-                        //     continue;
-                        // }
-                        // if(__popcnt(sample|mask_0)!=m_0_count){
-                        //     continue;
-                        // }
+                        }
                         gn.set_register(L1_candidates[j], 0);
                         gn.set_register(L2_candidates[i], 1);                       
-                        //gn.set_register(static_cast<uint32_t>(k), 2);
                         gn.set_register(L3_candidate, 2);
                         bool flag = true;
                         for(int s = 0; s < static_cast<int>(full_gamma_template.size()); s++){
@@ -266,7 +206,7 @@ void register_recovery::recover_L3(){
                         }  
                         if(flag){
                             cout << full_gamma_template;
-                            cout << L1_candidates[j] << " " << L2_candidates[i] << " " << L3_candidate << "\n";
+                            cout << "L1: " << L1_candidates[j] << ", L2: " << L2_candidates[i] << ", L3: " << L3_candidate << "\n";
                             term.store(true);
                             return;
                         }  
@@ -276,5 +216,4 @@ void register_recovery::recover_L3(){
             );
         }
     }
-    // cout << counter_32 << " " << counter_320;
 }
