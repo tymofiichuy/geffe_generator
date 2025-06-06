@@ -125,36 +125,65 @@ void register_recovery::recover_L2(){
 }
 
 void register_recovery::recover_L3(){
-    //const uint32_t gamma_template_32 = 0x82AB0478;
+    int counter_320 = 0, counter_32 = 0;
     const uint32_t gamma_template_32 = 0x82AB0478;
+    bitset<320> gamma_template_320("10000010101010110000010001111000001000110010000011101101000100101010110111000110010000010001011001110100001000101011011001000011000011010101011000000111110011010001111100110110100010011110010111101111110101000100110010000101011011010111100101100011000011101101010000100100101100110111011111011100101101000001110011110111");
     uint32_t mask_1, mask_0, not_mask_0;
-    uint32_t L1_sample, L2_sample;
-    lfsr L1_lfsr(30, 0x32800000), L2_lfsr(31, 0x48000000);      
+    uint32_t L1_sample_32, L2_sample_32;
+    bitset<320> L1_sample_320, L2_sample_320;
+    lfsr L1_lfsr(30, 0x32800000), L2_lfsr(31, 0x48000000);    
     for(int i = 0; i < static_cast<int>(L2_candidates.size()); i++){
         for(int j = 0; j < static_cast<int>(L1_candidates.size()); j++){
             L1_lfsr.set_register(L1_candidates[j]);
             L2_lfsr.set_register(L2_candidates[i]);
-            L1_sample = 0;
-            L2_sample = 0;
-            for(int l = 31; l >= 0; l--){
+            L1_sample_32 = 0;
+            L2_sample_32 = 0;
+            L1_sample_320.reset();
+            L2_sample_320.reset();
+            // for(int l = 31; l >= 0; l--){
+            //     if(L1_lfsr.fast_clock()){
+            //         L1_sample_32 |= (1<<l);
+            //     }
+            //     if(L2_lfsr.fast_clock()){
+            //         L2_sample_32 |= (1<<l);
+            //     }
+            // }
+            for(int l = 319; l >= 0; l--){
                 if(L1_lfsr.fast_clock()){
-                    L1_sample |= (1<<l);
+                    L1_sample_320.set(l);
                 }
                 if(L2_lfsr.fast_clock()){
-                    L2_sample |= (1<<l);
+                    L2_sample_320.set(l);
+                } 
+            }
+            for(int l = 319, bit = 31; l > 287; l--, bit--){
+                if(L1_sample_320[l]==1){
+                    L1_sample_32 |= (1<<bit);
+                }
+                if(L2_sample_320[l]==1){
+                    L2_sample_32 |= (1<<bit);
                 }
             }
-            if(((~(L1_sample^L2_sample))&(L2_sample^gamma_template_32))!=0){
+            // if(((~(L1_sample_32^L2_sample_32))&(L2_sample_32^gamma_template_32))!=0){
+            //     continue;
+            // }
+            // else{
+            //     counter_32++;
+            //     if(!((~(L1_sample_320^L2_sample_320))&(L2_sample_320^gamma_template_320)).any()){
+            //         counter_320++;
+            //     }
+            // }
+            if(((~(L1_sample_320^L2_sample_320))&(L2_sample_320^gamma_template_320)).any()){
                 continue;
-            }
+            }   
             unsigned int m_1_count, m_0_count;
             //1 if 1 in the mask is set, 0 in the other case
-            mask_1 = (L1_sample^L2_sample)&(L2_sample^gamma_template_32);
+            mask_1 = (L1_sample_32^L2_sample_32)&(L2_sample_32^gamma_template_32);
             m_1_count = __popcnt(mask_1);
             //0 if 0 in the mask is set, 1 in the other case
-            mask_0 = (~(L1_sample^L2_sample))|(L2_sample^gamma_template_32);
+            mask_0 = (~(L1_sample_32^L2_sample_32))|(L2_sample_32^gamma_template_32);
             m_0_count = __popcnt(mask_0);
-            not_mask_0 = ~mask_0;
+            not_mask_0 = ~mask_0; 
             
             // uint64_t chunk_num = 0x100000000ull/131072;
             // cout << __popcnt(~(not_mask_0|mask_1)) << "\n";
@@ -171,14 +200,14 @@ void register_recovery::recover_L3(){
             // cout << chunk_size << "\n";
 
             atomic_bool term;
-            term.store(false);
+            term.store(false);  
             concurrency::parallel_for(uint64_t(0), chunk_num, [&](uint64_t chunk_index){
                 if(term.load()==false){
                     geffe_generator gn;
                     uint32_t L3_candidate;
-                    uint32_t sample;
-                    bool bit;
-                    // for(uint64_t k = chunk_index*131072; k < (chunk_index+1)*131072; k++){
+                    // uint32_t sample;
+                    // bool bit;
+                    // for(uint64_t k = chunk_index*131072; k < (chunk_index+1)*131072; k++){  
                     for(uint64_t k = chunk_index*chunk_size; k < (chunk_index+1)*chunk_size; k++){
                         uint32_t iteration = static_cast<uint32_t>(k);
                         int counter = 0;
@@ -190,26 +219,34 @@ void register_recovery::recover_L3(){
                             else if((not_mask_0&(1<<t))!=0){
                                 continue;
                             }
-                            else if((iteration&(1<<counter))!=0){
+                            else{
+                                if((iteration&(1<<counter))!=0){
+                                    L3_candidate ^= (1<<t);
+                                }
                                 counter++;
-                                L3_candidate ^= (1<<t);
                             }
-                        }
+                            // else if((iteration&(1<<counter))!=0){
+                            //     counter++;
+                            //     L3_candidate ^= (1<<t);
+                            // }
+                        } 
+                        // cout << L3_candidate << "\n";
 
-                        gn.set_register(L1_candidates[j], 0);
-                        gn.set_register(L2_candidates[i], 1);                       
-                        //gn.set_register(static_cast<uint32_t>(k), 2);
-                        gn.set_register(L3_candidate, 2);
-                        sample = 0;
-                        for(uint8_t s = 31; s >= 0; s--){
-                            bit = gn.clock();
-                            if(bit){
-                                sample |= (1<<s);
-                            }
-                        }
-                        if((sample^gamma_template_32)!=0){
-                            continue;
-                        }
+                        // gn.set_register(L1_candidates[j], 0);
+                        // gn.set_register(L2_candidates[i], 1);                       
+                        // //gn.set_register(static_cast<uint32_t>(k), 2);
+                        // gn.set_register(L3_candidate, 2);
+                        // sample = 0;
+                        // //!!!
+                        // for(int s = 31; s >= 0; s--){
+                        //     bit = gn.clock();
+                        //     if(bit){
+                        //         sample |= (1<<s);
+                        //     }
+                        // } 
+                        // if((sample^gamma_template_32)!=0){
+                        //     continue;
+                        // }
                         // if(__popcnt(sample&mask_1)!=m_1_count){
                         //     continue;
                         // }
@@ -218,23 +255,26 @@ void register_recovery::recover_L3(){
                         // }
                         gn.set_register(L1_candidates[j], 0);
                         gn.set_register(L2_candidates[i], 1);                       
-                        gn.set_register(static_cast<uint32_t>(k), 2);
+                        //gn.set_register(static_cast<uint32_t>(k), 2);
+                        gn.set_register(L3_candidate, 2);
                         bool flag = true;
                         for(int s = 0; s < static_cast<int>(full_gamma_template.size()); s++){
                             if(gn.clock()!=full_gamma_template[s]){
                                 flag = false;
                                 break;
                             }
-                        }
+                        }  
                         if(flag){
-                            cout << L1_candidates[j] << " " << L2_candidates[i] << " " << static_cast<uint32_t>(k) << "\n";
+                            cout << full_gamma_template;
+                            cout << L1_candidates[j] << " " << L2_candidates[i] << " " << L3_candidate << "\n";
                             term.store(true);
                             return;
-                        }
-                    }                    
+                        }  
+                    }                      
                 }
             }
             );
         }
     }
+    // cout << counter_32 << " " << counter_320;
 }
