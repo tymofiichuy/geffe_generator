@@ -21,6 +21,6 @@ int main(){
     rr.set_full_gamma_template(gamma_template);
     rr.recover_L3();
     auto end = chrono::high_resolution_clock::now();
-    cout << "Done in: " << chrono::duration_cast<chrono::seconds>(end-start).count() << " s";
+    cout << "Done in: " << chrono::duration_cast<chrono::seconds>(end-start).count() << "s";
     return 0;
 }

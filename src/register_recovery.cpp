@@ -205,7 +205,6 @@ void register_recovery::recover_L3(){
                             }
                         }  
                         if(flag){
-                            cout << full_gamma_template;
                             cout << "L1: " << L1_candidates[j] << ", L2: " << L2_candidates[i] << ", L3: " << L3_candidate << "\n";
                             term.store(true);
                             return;
