@@ -125,8 +125,9 @@ void register_recovery::recover_L2(){
 }
 
 void register_recovery::recover_L3(){
+    //const uint32_t gamma_template_32 = 0x82AB0478;
     const uint32_t gamma_template_32 = 0x82AB0478;
-    uint32_t mask_1, mask_0;
+    uint32_t mask_1, mask_0, not_mask_0;
     uint32_t L1_sample, L2_sample;
     lfsr L1_lfsr(30, 0x32800000), L2_lfsr(31, 0x48000000);      
     for(int i = 0; i < static_cast<int>(L2_candidates.size()); i++){
@@ -153,19 +154,52 @@ void register_recovery::recover_L3(){
             //0 if 0 in the mask is set, 1 in the other case
             mask_0 = (~(L1_sample^L2_sample))|(L2_sample^gamma_template_32);
             m_0_count = __popcnt(mask_0);
+            not_mask_0 = ~mask_0;
             
-            uint64_t chunk_num = 0x100000000ull/131072;
+            // uint64_t chunk_num = 0x100000000ull/131072;
+            // cout << __popcnt(~(not_mask_0|mask_1)) << "\n";
+            uint64_t sh = (static_cast<uint64_t>(1)<<__popcnt(~(not_mask_0|mask_1)));
+            // cout << sh << "\n";
+            uint64_t chunk_size = 131072;
+            uint64_t chunk_num = sh/chunk_size;
+            // cout << chunk_num << "\n";
+            while(chunk_num < 16){
+                chunk_size >>= 1;                
+                chunk_num = sh/chunk_size;
+            }
+            // cout << chunk_num << "\n";
+            // cout << chunk_size << "\n";
+
             atomic_bool term;
             term.store(false);
             concurrency::parallel_for(uint64_t(0), chunk_num, [&](uint64_t chunk_index){
                 if(term.load()==false){
                     geffe_generator gn;
+                    uint32_t L3_candidate;
                     uint32_t sample;
                     bool bit;
-                    for(uint64_t k = chunk_index*131072; k < (chunk_index+1)*131072; k++){
+                    // for(uint64_t k = chunk_index*131072; k < (chunk_index+1)*131072; k++){
+                    for(uint64_t k = chunk_index*chunk_size; k < (chunk_index+1)*chunk_size; k++){
+                        uint32_t iteration = static_cast<uint32_t>(k);
+                        int counter = 0;
+                        L3_candidate = 0;
+                        for(int t = 31; t >= 0; t--){
+                            if((mask_1&(1<<t))!=0){
+                                L3_candidate ^= (1<<t);
+                            }
+                            else if((not_mask_0&(1<<t))!=0){
+                                continue;
+                            }
+                            else if((iteration&(1<<counter))!=0){
+                                counter++;
+                                L3_candidate ^= (1<<t);
+                            }
+                        }
+
                         gn.set_register(L1_candidates[j], 0);
                         gn.set_register(L2_candidates[i], 1);                       
-                        gn.set_register(static_cast<uint32_t>(k), 2);
+                        //gn.set_register(static_cast<uint32_t>(k), 2);
+                        gn.set_register(L3_candidate, 2);
                         sample = 0;
                         for(uint8_t s = 31; s >= 0; s--){
                             bit = gn.clock();
@@ -173,18 +207,21 @@ void register_recovery::recover_L3(){
                                 sample |= (1<<s);
                             }
                         }
-                        if(__popcnt(sample&mask_1)!=m_1_count){
+                        if((sample^gamma_template_32)!=0){
                             continue;
                         }
-                        if(__popcnt(sample|mask_0)!=m_0_count){
-                            continue;
-                        }
-                        gn.set_register(0, L1_candidates[j]);
-                        gn.set_register(1, L2_candidates[i]);
-                        gn.set_register(2, static_cast<uint32_t>(k));
+                        // if(__popcnt(sample&mask_1)!=m_1_count){
+                        //     continue;
+                        // }
+                        // if(__popcnt(sample|mask_0)!=m_0_count){
+                        //     continue;
+                        // }
+                        gn.set_register(L1_candidates[j], 0);
+                        gn.set_register(L2_candidates[i], 1);                       
+                        gn.set_register(static_cast<uint32_t>(k), 2);
                         bool flag = true;
                         for(int s = 0; s < static_cast<int>(full_gamma_template.size()); s++){
-                            if(!(gn.clock()&full_gamma_template[s])){
+                            if(gn.clock()!=full_gamma_template[s]){
                                 flag = false;
                                 break;
                             }
