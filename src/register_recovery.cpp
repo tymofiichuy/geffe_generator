@@ -46,7 +46,7 @@ void register_recovery::set_full_gamma_template(std::string& sequence){
         throw std::invalid_argument("Invalid template");
     }
     full_gamma_template.reset();
-    for(int i = 0; i < population; i++){
+    for(int i = 0; i < static_cast<int>(sequence.size()); i++){
         if(sequence[i] == '1'){
             full_gamma_template.set(i);
         }
@@ -95,7 +95,7 @@ void register_recovery::recover_L1(){
         }
     }
     );
-    cout << "L1 candidates are found.\n";
+    cout << "L1 candidates are found: " << L1_candidates.size() << " items.\n";
     // for(int i = 0; i < static_cast<int>(L1_candidates.size()); i++){
     //     cout << L1_candidates[i] << "\n";
     // }
@@ -118,46 +118,59 @@ void register_recovery::recover_L2(){
         }
     }
     );
-    cout << "L2 candidates are found.\n";
+    cout << "L2 candidates are found: " << L2_candidates.size() << " items.\n";
     // for(int i = 0; i < static_cast<int>(L2_candidates.size()); i++){
     //     cout << L2_candidates[i] << "\n";
     // }
-    // cout << L2_candidates.size();
 }
 
 void register_recovery::recover_L3(){
-    const uint32_t gamma_template_32 = 0x82AB0478;    
+    const uint32_t gamma_template_32 = 0x82AB0478;
+    uint32_t mask_1, mask_0;
+    uint32_t L1_sample, L2_sample;
+    lfsr L1_lfsr(30, 0x32800000), L2_lfsr(31, 0x48000000);      
     for(int i = 0; i < static_cast<int>(L2_candidates.size()); i++){
-        uint32_t mask_1, mask_0;
         for(int j = 0; j < static_cast<int>(L1_candidates.size()); j++){
-            if(((~(L1_candidates[j]^L2_candidates[i]))&(L2_candidates[i]^gamma_template_32))!=0){
+            L1_lfsr.set_register(L1_candidates[j]);
+            L2_lfsr.set_register(L2_candidates[i]);
+            L1_sample = 0;
+            L2_sample = 0;
+            for(int l = 31; l >= 0; l--){
+                if(L1_lfsr.fast_clock()){
+                    L1_sample |= (1<<l);
+                }
+                if(L2_lfsr.fast_clock()){
+                    L2_sample |= (1<<l);
+                }
+            }
+            if(((~(L1_sample^L2_sample))&(L2_sample^gamma_template_32))!=0){
                 continue;
             }
-
             unsigned int m_1_count, m_0_count;
             //1 if 1 in the mask is set, 0 in the other case
-            mask_1 = (L1_candidates[j]^L2_candidates[i])&(L2_candidates[i]^gamma_template_32);
+            mask_1 = (L1_sample^L2_sample)&(L2_sample^gamma_template_32);
             m_1_count = __popcnt(mask_1);
             //0 if 0 in the mask is set, 1 in the other case
-            mask_0 = (~(L1_candidates[j]^L2_candidates[i]))|(L2_candidates[i]^gamma_template_32);
+            mask_0 = (~(L1_sample^L2_sample))|(L2_sample^gamma_template_32);
             m_0_count = __popcnt(mask_0);
             
             uint64_t chunk_num = 0x100000000ull/131072;
-            atomic_bool term = false;
+            atomic_bool term;
+            term.store(false);
             concurrency::parallel_for(uint64_t(0), chunk_num, [&](uint64_t chunk_index){
-                if(!term.load()){
+                if(term.load()==false){
                     geffe_generator gn;
                     uint32_t sample;
                     bool bit;
                     for(uint64_t k = chunk_index*131072; k < (chunk_index+1)*131072; k++){
-                        gn.set_register(0, L1_candidates[j]);
-                        gn.set_register(1, L2_candidates[i]);                       
-                        gn.set_register(2, static_cast<uint32_t>(k));
+                        gn.set_register(L1_candidates[j], 0);
+                        gn.set_register(L2_candidates[i], 1);                       
+                        gn.set_register(static_cast<uint32_t>(k), 2);
                         sample = 0;
-                        for(uint8_t s = 0; s < 32; s++){
+                        for(uint8_t s = 31; s >= 0; s--){
                             bit = gn.clock();
                             if(bit){
-                                sample |= 1<<s;
+                                sample |= (1<<s);
                             }
                         }
                         if(__popcnt(sample&mask_1)!=m_1_count){
